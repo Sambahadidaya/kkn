@@ -8,6 +8,84 @@ import { encryptText, hashNik } from '../../../lib/crypto';
 import { uploadKtpPhoto } from '../storage';
 import { checkRateLimit } from '../../../scurity/ratelimit';
 
+export async function resolveWilayahIds(service, { nomorRw, nomorRt, rwId, rtId }) {
+  let finalRwId = rwId || null;
+  let finalRtId = rtId || null;
+
+  // Resolusi RW dari nomorRw (angka)
+  if (nomorRw !== undefined && nomorRw !== null && nomorRw !== '') {
+    const rwNum = parseInt(nomorRw, 10);
+    if (!isNaN(rwNum)) {
+      const { data: existingRw } = await service
+        .from('rw')
+        .select('id')
+        .eq('nomor', rwNum)
+        .maybeSingle();
+
+      if (existingRw) {
+        finalRwId = existingRw.id;
+      } else {
+        const { data: newRw, error: rwErr } = await service
+          .from('rw')
+          .insert({ nomor: rwNum, kelurahan: 'Kelurahan' })
+          .select('id')
+          .single();
+        if (!rwErr && newRw) {
+          finalRwId = newRw.id;
+        }
+      }
+    }
+  }
+
+  // Resolusi RT dari nomorRt (angka)
+  if (nomorRt !== undefined && nomorRt !== null && nomorRt !== '') {
+    const rtNum = parseInt(nomorRt, 10);
+    if (!isNaN(rtNum)) {
+      // Pastikan ada RW induk
+      if (!finalRwId) {
+        let { data: defaultRw } = await service
+          .from('rw')
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+        if (!defaultRw) {
+          const { data: createdRw } = await service
+            .from('rw')
+            .insert({ nomor: 1, kelurahan: 'Kelurahan' })
+            .select('id')
+            .single();
+          defaultRw = createdRw;
+        }
+        if (defaultRw) finalRwId = defaultRw.id;
+      }
+
+      if (finalRwId) {
+        const { data: existingRt } = await service
+          .from('rt')
+          .select('id')
+          .eq('rw_id', finalRwId)
+          .eq('nomor', rtNum)
+          .maybeSingle();
+
+        if (existingRt) {
+          finalRtId = existingRt.id;
+        } else {
+          const { data: newRt, error: rtErr } = await service
+            .from('rt')
+            .insert({ rw_id: finalRwId, nomor: rtNum })
+            .select('id')
+            .single();
+          if (!rtErr && newRt) {
+            finalRtId = newRt.id;
+          }
+        }
+      }
+    }
+  }
+
+  return { rwId: finalRwId, rtId: finalRtId };
+}
+
 export async function registrasiWargaAction(formData) {
   try {
     const {
@@ -22,6 +100,8 @@ export async function registrasiWargaAction(formData) {
       jenisKelamin,
       pekerjaan,
       detailKtp,
+      nomorRw,
+      nomorRt,
       rtId,
       rwId,
       nomorRumah,
@@ -54,16 +134,24 @@ export async function registrasiWargaAction(formData) {
       return { success: false, error: pwdCheck.message };
     }
 
-    if (!nik || !namaKtp || !rtId || !nomorRumah) {
-      return { success: false, error: 'Data KTP, nomor rumah, dan RT wajib diisi.' };
+    const service = getSupabaseServiceClient();
+
+    // Resolusi wilayah RT dan RW dari nomor atau ID
+    const { rwId: resolvedRwId, rtId: resolvedRtId } = await resolveWilayahIds(service, {
+      nomorRw,
+      nomorRt,
+      rwId,
+      rtId
+    });
+
+    if (!nik || !namaKtp || !resolvedRtId || !nomorRumah) {
+      return { success: false, error: 'Data KTP, nomor RT, nomor RW, dan nomor rumah wajib diisi.' };
     }
 
     const cleanEmail = sanitizeEmail(emailUser);
     const cleanPhone = sanitizePhone(noTelepon);
     const cleanNama = sanitizeString(namaUser);
     const cleanNomorRumah = sanitizeString(nomorRumah, 20);
-
-    const service = getSupabaseServiceClient();
 
     // 2. Cek Rate Limiter
     if (!checkRateLimit(`reg_${cleanEmail}`, 5, 60000)) {
@@ -155,8 +243,8 @@ export async function registrasiWargaAction(formData) {
       email: cleanEmail,
       no_telepon: cleanPhone,
       role: 'warga',
-      rt_id: rtId,
-      rw_id: rwId || null,
+      rt_id: resolvedRtId,
+      rw_id: resolvedRwId || null,
       aktif: true
     });
 
@@ -168,7 +256,7 @@ export async function registrasiWargaAction(formData) {
 
     // 9. Simpan Data Rumah (menghasilkan rumah.id unik yang dipakai sebagai QR Rumah)
     const { error: rumahError } = await service.from('rumah').insert({
-      rt_id: rtId,
+      rt_id: resolvedRtId,
       nomor_rumah: cleanNomorRumah,
       warga_id: userId
     });

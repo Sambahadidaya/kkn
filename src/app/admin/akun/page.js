@@ -25,8 +25,8 @@ export default function AdminAkunPage() {
     noTelepon: '',
     password: '',
     role: 'petugas',
-    rtId: '',
-    rwId: ''
+    nomorRt: '',
+    nomorRw: ''
   });
 
   const loadData = async () => {
@@ -65,8 +65,8 @@ export default function AdminAkunPage() {
           noTelepon: '',
           password: '',
           role: 'petugas',
-          rtId: '',
-          rwId: ''
+          nomorRt: '',
+          nomorRw: ''
         });
         loadData();
       } else {
@@ -282,38 +282,40 @@ export default function AdminAkunPage() {
             />
           </div>
 
-          {/* Pemilihan Wilayah RT / RW */}
+          {/* Pemilihan Wilayah RT / RW Berupa Angka Biasa */}
           {(formData.role === 'rt' || formData.role === 'rw') && (
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
-                <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Pilih RW</label>
-                <select
-                  value={formData.rwId}
-                  onChange={(e) => setFormData({ ...formData, rwId: e.target.value })}
+                <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">
+                  Nomor RW *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={999}
+                  value={formData.nomorRw}
+                  onChange={(e) => setFormData({ ...formData, nomorRw: e.target.value })}
+                  placeholder="Contoh: 5"
                   className="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl"
-                >
-                  <option value="">-- Pilih RW --</option>
-                  {wilayah.rw.map(rw => (
-                    <option key={rw.id} value={rw.id}>RW {rw.nomor}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               {formData.role === 'rt' && (
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">Pilih RT</label>
-                  <select
-                    value={formData.rtId}
-                    onChange={(e) => setFormData({ ...formData, rtId: e.target.value })}
+                  <label className="block text-xs font-semibold text-stone-700 uppercase mb-1">
+                    Nomor RT *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    max={999}
+                    value={formData.nomorRt}
+                    onChange={(e) => setFormData({ ...formData, nomorRt: e.target.value })}
+                    placeholder="Contoh: 2"
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-xl"
-                  >
-                    <option value="">-- Pilih RT --</option>
-                    {wilayah.rt
-                      .filter(rt => !formData.rwId || rt.rw_id === formData.rwId)
-                      .map(rt => (
-                        <option key={rt.id} value={rt.id}>RT {rt.nomor}</option>
-                      ))}
-                  </select>
+                  />
                 </div>
               )}
             </div>

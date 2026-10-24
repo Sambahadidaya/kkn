@@ -1,0 +1,1 @@
+pada saat mencan ktp itukan langsung fullscreen, nah saya ingin bingkainya itu dari landscape bukan potrait. terus saya ingin pada scan itu bisa mengatur fokusnya dan kecerahannya seperti kamera konvesional, terus saya ingin yang div nik itu hapus saja dan saya juga ingin ada animasi scanner looping. yang untuk animasi saya ingin difile animasi/scanner.js

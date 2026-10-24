@@ -4,6 +4,7 @@
 import { getSupabaseServiceClient } from '../../../utils/supabaseUtils';
 import { assertRole } from '../../../scurity/roleakses';
 import { sanitizeEmail, sanitizePhone, sanitizeString, sanitizeUsername } from '../../../scurity/sanitaze';
+import { resolveWilayahIds } from '../public/registrasi';
 
 export async function getDaftarAkunAction() {
   try {
@@ -33,6 +34,8 @@ export async function buatAkunAparaturAction({
   noTelepon,
   password,
   role, // 'petugas' | 'rt' | 'rw' | 'kelurahan'
+  nomorRt,
+  nomorRw,
   rtId,
   rwId
 }) {
@@ -42,6 +45,28 @@ export async function buatAkunAparaturAction({
 
     if (!email || !password || !nama || !role) {
       return { success: false, error: 'Nama, email, password, dan role wajib diisi.' };
+    }
+
+    // Resolusi wilayah jika role adalah rt atau rw
+    let finalRwId = rwId || null;
+    let finalRtId = rtId || null;
+
+    if (role === 'rt' || role === 'rw') {
+      const { rwId: resRw, rtId: resRt } = await resolveWilayahIds(service, {
+        nomorRw,
+        nomorRt,
+        rwId,
+        rtId
+      });
+      finalRwId = resRw;
+      finalRtId = role === 'rt' ? resRt : null;
+
+      if (role === 'rw' && !finalRwId) {
+        return { success: false, error: 'Nomor RW wajib diisi untuk akun RW.' };
+      }
+      if (role === 'rt' && (!finalRwId || !finalRtId)) {
+        return { success: false, error: 'Nomor RW dan RT wajib diisi untuk akun RT.' };
+      }
     }
 
     const cleanEmail = sanitizeEmail(email);
@@ -71,8 +96,8 @@ export async function buatAkunAparaturAction({
       email: cleanEmail,
       no_telepon: cleanPhone,
       role,
-      rt_id: rtId || null,
-      rw_id: rwId || null,
+      rt_id: finalRtId,
+      rw_id: finalRwId,
       aktif: true
     });
 

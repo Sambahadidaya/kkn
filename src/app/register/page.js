@@ -15,6 +15,7 @@ import {
   validatePassword,
   validateNama
 } from '../../scurity/formatLimitKarak';
+import ScannerAnimation from '../../components/animasi/scanner';
 import {
   Camera,
   ArrowRight,
@@ -26,7 +27,11 @@ import {
   Phone,
   Lock,
   Home,
-  X
+  X,
+  Sun,
+  Crosshair,
+  RotateCcw,
+  Sliders
 } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -52,8 +57,8 @@ export default function RegisterPage() {
     jenisKelamin: 'LAKI-LAKI',
     pekerjaan: '',
     detailKtp: '',
-    rwId: '',
-    rtId: '',
+    nomorRw: '',
+    nomorRt: '',
     nomorRumah: ''
   });
 
@@ -73,6 +78,12 @@ export default function RegisterPage() {
   const mediaStreamRef = useRef(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+
+  // Kontrol Kamera Konvensional (Fokus & Kecerahan)
+  const [brightness, setBrightness] = useState(100);
+  const [showBrightnessSlider, setShowBrightnessSlider] = useState(false);
+  const [focusPoint, setFocusPoint] = useState(null);
+  const [isFocusing, setIsFocusing] = useState(false);
 
   useEffect(() => {
     async function fetchWilayah() {
@@ -102,7 +113,7 @@ export default function RegisterPage() {
     }
   }, [cameraActive]);
 
-  // Hentikan media stream
+  // Hentikan media stream & reset kontrol kamera
   const stopCameraStream = () => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => {
@@ -116,12 +127,42 @@ export default function RegisterPage() {
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
+    setBrightness(100);
+    setShowBrightnessSlider(false);
+    setFocusPoint(null);
+    setIsFocusing(false);
+  };
+
+  // Interaksi Tap-to-Focus kamera konvensional
+  const handleTapToFocus = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+
+    if (clientX !== undefined && clientY !== undefined) {
+      setFocusPoint({ x: clientX - rect.left, y: clientY - rect.top });
+      setIsFocusing(true);
+      setTimeout(() => setIsFocusing(false), 1200);
+    }
+
+    try {
+      const track = mediaStreamRef.current?.getVideoTracks()?.[0];
+      if (track && track.applyConstraints) {
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.focusMode && caps.focusMode.includes('continuous')) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+        }
+      }
+    } catch (_) {}
   };
 
   // Nyalakan Kamera dengan Fallback constraint
   const startCamera = async () => {
     setCameraError(null);
     setNotif(null);
+    setBrightness(100);
+    setShowBrightnessSlider(false);
+    setFocusPoint(null);
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError('Browser ini tidak mendukung akses kamera atau koneksi tidak aman (harus localhost / HTTPS).');
@@ -170,7 +211,7 @@ export default function RegisterPage() {
     }
   };
 
-  // Jepret foto dari stream video
+  // Jepret foto dari stream video (terapkan filter kecerahan jika disesuaikan)
   const capturePhoto = () => {
     if (!videoRef.current) return;
 
@@ -180,7 +221,12 @@ export default function RegisterPage() {
       canvas.width = video.videoWidth || 1280;
       canvas.height = video.videoHeight || 720;
       const ctx = canvas.getContext('2d');
+
+      if (brightness !== 100) {
+        ctx.filter = `brightness(${brightness}%) contrast(105%)`;
+      }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.filter = 'none';
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       stopCameraStream();
@@ -201,20 +247,44 @@ export default function RegisterPage() {
       if (res.success && res.data && res.isKtp !== false && res.data.nik) {
         const d = res.data;
         setFotoKtp(dataUrl);
+
+        // Ekstraksi dan sanitasi nama dari hasil pembacaan AI Vision KTP
+        let ocrNama = d.nama || d.nama_lengkap || d.Nama || '';
+        if (typeof ocrNama === 'string') {
+          ocrNama = ocrNama.replace(/^nama\s*[:\-\.]?\s*/i, '').trim();
+          ocrNama = ocrNama.replace(/^["']|["']$/g, '').trim();
+        }
+
+        // Tampilkan nama KTP hasil scan, jangan timpa dengan nama akun kecuali jika OCR tidak menemukan
+        const namaHasilScan = ocrNama || d.nama || namaUser || '';
+
+        // Deteksi nomor RT dan RW dari hasil OCR jika ada (misal format "003/005")
+        let autoRt = '';
+        let autoRw = '';
+        if (d.rt_rw) {
+          const matchRtRw = String(d.rt_rw).match(/(\d+)\s*[\/\-]\s*(\d+)/);
+          if (matchRtRw) {
+            autoRt = String(parseInt(matchRtRw[1], 10) || '');
+            autoRw = String(parseInt(matchRtRw[2], 10) || '');
+          }
+        }
+
         setKtpData(prev => ({
           ...prev,
           nik: d.nik || prev.nik,
-          namaKtp: d.nama || d.nama_lengkap || namaUser || prev.namaKtp,
+          namaKtp: namaHasilScan,
           alamatKtp: d.alamat || prev.alamatKtp,
           tempatLahir: d.tempat_lahir || prev.tempatLahir,
           tanggalLahir: d.tanggal_lahir || prev.tanggalLahir,
           jenisKelamin: d.jenis_kelamin?.toUpperCase().includes('PEREMPUAN') ? 'PEREMPUAN' : 'LAKI-LAKI',
           pekerjaan: d.pekerjaan || prev.pekerjaan,
+          nomorRt: autoRt || prev.nomorRt,
+          nomorRw: autoRw || prev.nomorRw,
           detailKtp: JSON.stringify(d)
         }));
         setNotif({
           tipe: 'sukses',
-          pesan: 'KTP terverifikasi dan berhasil dibaca AI! Silakan klik "Lanjut ke Data KTP & Wilayah".'
+          pesan: 'KTP terverifikasi dan berhasil dibaca AI! Silakan periksa data hasil scan.'
         });
       } else {
         setFotoKtp(null);
@@ -261,8 +331,8 @@ export default function RegisterPage() {
   // Validasi Tahap 3 -> Pindah ke Tahap 4
   const handleNextStep3 = (e) => {
     e.preventDefault();
-    if (!ktpData.nik || !ktpData.namaKtp || !ktpData.rtId || !ktpData.nomorRumah) {
-      setNotif({ tipe: 'error', pesan: 'Harap lengkapi NIK, Nama KTP, RT, dan Nomor Rumah.' });
+    if (!ktpData.nik || !ktpData.namaKtp || !ktpData.nomorRt || !ktpData.nomorRw || !ktpData.nomorRumah) {
+      setNotif({ tipe: 'error', pesan: 'Harap lengkapi NIK, Nama KTP, Nomor RT, Nomor RW, dan Nomor Rumah.' });
       return;
     }
     setNotif(null);
@@ -647,38 +717,34 @@ export default function RegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-400 mb-1">
-                    Pilih RW *
+                    Nomor RW *
                   </label>
-                  <select
+                  <input
+                    type="number"
                     required
-                    value={ktpData.rwId}
-                    onChange={(e) => setKtpData({ ...ktpData, rwId: e.target.value, rtId: '' })}
+                    min={1}
+                    max={999}
+                    value={ktpData.nomorRw}
+                    onChange={(e) => setKtpData({ ...ktpData, nomorRw: e.target.value })}
+                    placeholder="Contoh: 5"
                     className="w-full px-3 py-2 text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 rounded-xl focus:border-[#2d6a4f] dark:focus:border-emerald-500 focus:outline-hidden"
-                  >
-                    <option value="">-- Pilih RW --</option>
-                    {wilayah.rw.map(rw => (
-                      <option key={rw.id} value={rw.id}>RW {rw.nomor}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-400 mb-1">
-                    Pilih RT *
+                    Nomor RT *
                   </label>
-                  <select
+                  <input
+                    type="number"
                     required
-                    value={ktpData.rtId}
-                    onChange={(e) => setKtpData({ ...ktpData, rtId: e.target.value })}
+                    min={1}
+                    max={999}
+                    value={ktpData.nomorRt}
+                    onChange={(e) => setKtpData({ ...ktpData, nomorRt: e.target.value })}
+                    placeholder="Contoh: 2"
                     className="w-full px-3 py-2 text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 rounded-xl focus:border-[#2d6a4f] dark:focus:border-emerald-500 focus:outline-hidden"
-                  >
-                    <option value="">-- Pilih RT --</option>
-                    {wilayah.rt
-                      .filter(rt => !ktpData.rwId || rt.rw_id === ktpData.rwId)
-                      .map(rt => (
-                        <option key={rt.id} value={rt.id}>RT {rt.nomor}</option>
-                      ))}
-                  </select>
+                  />
                 </div>
               </div>
 
@@ -835,105 +901,205 @@ export default function RegisterPage() {
       {cameraActive && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between select-none animate-in fade-in duration-200">
           {/* Header Kamera Fullscreen */}
-          <div className="p-4 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent z-10 text-white">
-            <div className="flex items-center gap-2">
+          <div className="p-4 flex items-center justify-between bg-gradient-to-b from-black/85 via-black/40 to-transparent z-20 text-white">
+            <div className="flex items-center gap-2.5">
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              <span className="text-xs font-bold tracking-wide uppercase">Pemindai KTP Aktif</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold tracking-wider uppercase text-emerald-400">
+                  Pemindai KTP Landscape
+                </span>
+                <span className="text-[10px] text-stone-300">
+                  Arahkan KTP secara horizontal di dalam bingkai
+                </span>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={stopCameraStream}
-              aria-label="Tutup Kamera"
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              {/* Tombol Toggle Kontrol Kecerahan & Fokus */}
+              <button
+                type="button"
+                onClick={() => setShowBrightnessSlider(prev => !prev)}
+                aria-label="Atur Kecerahan"
+                className={`p-2.5 rounded-full backdrop-blur-md transition-all cursor-pointer ${
+                  showBrightnessSlider || brightness !== 100
+                    ? 'bg-amber-500 text-stone-950 font-bold shadow-md shadow-amber-500/30'
+                    : 'bg-white/20 hover:bg-white/30 text-white'
+                }`}
+              >
+                <Sun className="w-4 h-4" />
+              </button>
+
+              {/* Tombol Tutup / Batal */}
+              <button
+                type="button"
+                onClick={stopCameraStream}
+                aria-label="Tutup Kamera"
+                className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          {/* Area Video Stream dengan Bingkai Panduan KTP & Frame Foto Wajah */}
-          <div className="relative flex-1 flex items-center justify-center overflow-hidden">
+          {/* Area Video Stream dengan Tap-to-Focus & Bingkai Panduan KTP Landscape */}
+          <div
+            onClick={handleTapToFocus}
+            onTouchStart={handleTapToFocus}
+            className="relative flex-1 flex items-center justify-center overflow-hidden cursor-crosshair"
+          >
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                filter: brightness !== 100 ? `brightness(${brightness}%) contrast(105%)` : 'none'
+              }}
+              className="absolute inset-0 w-full h-full object-cover transition-[filter] duration-150"
             />
 
-            {/* Bingkai Panduan Rasio Fisik KTP (85.6mm x 54mm ~ 1.58:1) */}
-            <div className="relative z-10 w-[92%] max-w-lg aspect-[1.58/1] rounded-2xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] pointer-events-none flex flex-col justify-between p-3 sm:p-4">
-              {/* Header Panduan KTP */}
-              <div className="flex justify-between items-center text-[10px] sm:text-[11px] font-bold text-emerald-300">
-                <span className="bg-black/60 px-2.5 py-1 rounded-md backdrop-blur-xs flex items-center gap-1">
+            {/* Indikator Reticle Tap-to-Focus Kamera Konvensional */}
+            {focusPoint && (
+              <div
+                className="absolute pointer-events-none z-30 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: focusPoint.x, top: focusPoint.y }}
+              >
+                <div
+                  className={`w-14 h-14 border-2 rounded-xl transition-all duration-200 flex items-center justify-center ${
+                    isFocusing
+                      ? 'border-amber-400 scale-90 shadow-[0_0_15px_rgba(251,191,36,0.9)] bg-amber-400/10'
+                      : 'border-emerald-400 scale-100 shadow-[0_0_10px_rgba(52,211,153,0.7)]'
+                  }`}
+                >
+                  <div className="w-1.5 h-1.5 bg-amber-300 rounded-full animate-ping" />
+                </div>
+                <span className="text-[9px] font-mono text-amber-300 font-bold bg-black/70 px-1.5 py-0.5 rounded absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                  FOKUS
+                </span>
+              </div>
+            )}
+
+            {/* Bingkai Panduan KTP Landscape Standar (Rasio ISO 85.6mm x 53.98mm ~ 1.586:1) */}
+            <div className="relative z-10 w-[94%] max-w-xl aspect-[1.586/1] rounded-2xl border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)] pointer-events-none flex flex-col justify-between p-3.5 sm:p-5">
+              {/* Animasi Pemindai Laser Looping dari animasi/scanner.js */}
+              <ScannerAnimation active={cameraActive} />
+
+              {/* Header Kartu KTP Landscape */}
+              <div className="flex justify-between items-center text-[10px] sm:text-[11px] font-bold text-emerald-300 z-10">
+                <span className="bg-black/65 px-2.5 py-1 rounded-md backdrop-blur-xs flex items-center gap-1.5 border border-emerald-500/30">
                   <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
                   REPUBLIK INDONESIA
                 </span>
-                <span className="bg-black/60 px-2.5 py-1 rounded-md backdrop-blur-xs text-stone-300">
+                <span className="bg-black/65 px-2.5 py-1 rounded-md backdrop-blur-xs text-stone-300 border border-stone-600/30">
                   KARTU TANDA PENDUDUK
                 </span>
               </div>
 
-              {/* Area Utama: Bagian Teks & Kotak Panduan Pas Foto Wajah */}
-              <div className="flex items-center justify-between gap-3 my-auto h-full max-h-[75%]">
+              {/* Area Dalam KTP: Garis Panduan Identitas (Div NIK telah dihapus) & Pas Foto Wajah di Kanan */}
+              <div className="flex items-center justify-between gap-3 my-auto h-full max-h-[72%] z-10">
+                {/* Sisi Kiri: Garis Panduan Teks KTP Landscape */}
                 <div className="flex-1 space-y-2 py-1 pr-2">
-                  <div className="border border-emerald-400/50 bg-black/40 rounded px-2 py-1">
-                    <span className="text-[9px] sm:text-[10px] font-mono text-emerald-300 font-bold block">
-                      NIK [ 16 DIGIT ]
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 opacity-60">
-                    <div className="h-1.5 bg-emerald-400/40 rounded w-3/4" />
-                    <div className="h-1.5 bg-emerald-400/40 rounded w-full" />
-                    <div className="h-1.5 bg-emerald-400/40 rounded w-5/6" />
-                    <div className="h-1.5 bg-emerald-400/30 rounded w-1/2" />
+                  <div className="space-y-1.5 opacity-70">
+                    <div className="h-2 bg-emerald-400/40 rounded w-1/3" />
+                    <div className="h-1.5 bg-emerald-400/30 rounded w-4/5" />
+                    <div className="h-1.5 bg-emerald-400/30 rounded w-full" />
+                    <div className="h-1.5 bg-emerald-400/30 rounded w-3/4" />
+                    <div className="h-1.5 bg-emerald-400/25 rounded w-1/2" />
+                    <div className="h-1.5 bg-emerald-400/25 rounded w-2/3" />
                   </div>
                 </div>
 
-                <div className="w-[30%] sm:w-[28%] aspect-[3/4] border-2 border-dashed border-emerald-300 bg-emerald-400/20 backdrop-blur-2xs rounded-xl flex flex-col items-center justify-center p-1.5 text-center shadow-lg">
-                  <User className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-200 mb-1 animate-pulse" />
-                  <span className="text-[9px] sm:text-[10px] font-extrabold text-white leading-tight bg-black/50 px-1 py-0.5 rounded">
-                    PAS FOTO WAJAH
+                {/* Sisi Kanan: Kotak Panduan Pas Foto Wajah */}
+                <div className="w-[28%] sm:w-[26%] aspect-[3/4] border-2 border-dashed border-emerald-300 bg-emerald-400/15 backdrop-blur-2xs rounded-xl flex flex-col items-center justify-center p-1.5 text-center shadow-lg">
+                  <User className="w-7 h-7 sm:w-9 sm:h-9 text-emerald-200 mb-1 animate-pulse" />
+                  <span className="text-[8px] sm:text-[9px] font-extrabold text-white leading-tight bg-black/60 px-1 py-0.5 rounded">
+                    PAS FOTO
                   </span>
                 </div>
               </div>
 
-              {/* Garis pemindai animasi laser */}
-              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse" />
-
-              {/* Instruksi Bawah Bingkai */}
-              <div className="text-center">
-                <span className="text-[10px] sm:text-[11px] font-medium text-emerald-200 bg-black/70 px-3 py-1 rounded-full backdrop-blur-xs">
-                  Paskan KTP pada bingkai & paskan wajah KTP di kotak kanan
+              {/* Instruksi Bawah Bingkai Landscape */}
+              <div className="text-center z-10">
+                <span className="text-[10px] sm:text-[11px] font-medium text-emerald-200 bg-black/75 px-3.5 py-1 rounded-full backdrop-blur-xs border border-emerald-500/20">
+                  Posisikan KTP Landscape di dalam bingkai • Tap layar untuk fokus
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Kontrol Bawah: Tombol Jepret Foto & Batal */}
-          <div className="p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-10 flex items-center justify-between max-w-md mx-auto w-full">
+          {/* Panel Pengaturan Kecerahan Kamera Konvensional (Floating Slider) */}
+          {showBrightnessSlider && (
+            <div className="mx-auto max-w-sm w-[90%] mb-2 p-3 bg-stone-900/90 backdrop-blur-md rounded-2xl border border-stone-700/80 text-white z-20 flex flex-col gap-2 shadow-2xl animate-in slide-in-from-bottom-2 duration-150">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <div className="flex items-center gap-1.5 text-amber-300">
+                  <Sun className="w-4 h-4" />
+                  <span>Kecerahan Kamera</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] text-stone-300">{brightness}%</span>
+                  {brightness !== 100 && (
+                    <button
+                      type="button"
+                      onClick={() => setBrightness(100)}
+                      className="p-1 text-[10px] text-stone-400 hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Sun className="w-3.5 h-3.5 text-stone-400" />
+                <input
+                  type="range"
+                  min="60"
+                  max="160"
+                  step="5"
+                  value={brightness}
+                  onChange={(e) => setBrightness(Number(e.target.value))}
+                  className="flex-1 accent-amber-400 cursor-pointer h-1.5 bg-stone-700 rounded-lg"
+                />
+                <Sun className="w-5 h-5 text-amber-300" />
+              </div>
+            </div>
+          )}
+
+          {/* Kontrol Bawah: Tombol Jepret Foto, Pengaturan, & Batal */}
+          <div className="p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-20 flex items-center justify-between max-w-md mx-auto w-full">
+            {/* Tombol Batal */}
             <button
               type="button"
               onClick={stopCameraStream}
-              className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md transition-colors cursor-pointer"
             >
               Batal
             </button>
 
-            {/* Shutter Button Ambil Foto */}
+            {/* Shutter Button Ambil Foto (Kamera Konvensional) */}
             <button
               type="button"
               onClick={capturePhoto}
               aria-label="Ambil Foto KTP"
-              className="w-18 h-18 rounded-full border-4 border-white bg-emerald-500 hover:bg-emerald-400 active:scale-95 shadow-lg shadow-emerald-500/50 flex items-center justify-center text-white transition-all cursor-pointer group"
+              className="w-18 h-18 rounded-full border-4 border-white bg-emerald-500 hover:bg-emerald-400 active:scale-95 shadow-xl shadow-emerald-500/50 flex items-center justify-center text-white transition-all cursor-pointer group"
             >
               <Camera className="w-7 h-7 group-hover:scale-110 transition-transform" />
             </button>
 
-            <div className="w-16 flex justify-end">
-              <span className="text-[11px] text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-1 rounded-lg border border-emerald-800/60">
-                Live Scan
-              </span>
-            </div>
+            {/* Tombol Kontrol Kecerahan Cepat */}
+            <button
+              type="button"
+              onClick={() => setShowBrightnessSlider(prev => !prev)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                showBrightnessSlider
+                  ? 'bg-amber-500 text-stone-950 font-bold'
+                  : 'bg-white/10 hover:bg-white/20 text-stone-200'
+              }`}
+            >
+              <Sun className="w-4 h-4 text-amber-300" />
+              <span className="hidden sm:inline">Kecerahan</span>
+            </button>
           </div>
         </div>
       )}

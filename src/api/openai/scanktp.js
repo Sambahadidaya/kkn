@@ -18,26 +18,39 @@ export async function scanKtpAction(imageBase64) {
       cleanDataUrl = `data:image/jpeg;base64,${cleanDataUrl}`;
     }
 
-    const prompt = aiConfig.prompt_ocr_ktp ||
-      `Periksa gambar ini dengan teliti. 
-1. Tentukan apakah gambar ini BENAR-BENAR merupakan foto dokumen fisik Kartu Tanda Penduduk (KTP) Republik Indonesia yang valid dan terbaca informasinya.
-2. JIKA GAMBAR BUKAN KTP (misalnya foto orang, selfie, pemandangan, benda sembarangan, dokumen non-KTP) ATAU KTP SANGAT BURAM/TIDAK TERBACA, kembalikan JSON persis seperti ini:
-{"is_ktp": false, "alasan": "Gambar bukan KTP Indonesia yang valid atau foto terlalu buram sehingga data tidak dapat terbaca."}
-3. JIKA GAMBAR ADALAH KTP VALID, ekstrak informasinya ke dalam JSON murni dengan atribut:
-{"is_ktp": true, "nik": "16 digit NIK", "nama": "Nama lengkap", "tempat_lahir": "...", "tanggal_lahir": "DD-MM-YYYY", "jenis_kelamin": "LAKI-LAKI/PEREMPUAN", "alamat": "...", "rt_rw": "...", "kel_desa": "...", "kecamatan": "...", "agama": "...", "status_perkawinan": "...", "pekerjaan": "...", "kewarganegaraan": "WNI"}.
-Wajib berikan format JSON murni tanpa awalan/akhiran markdown.`;
+    // Instruksi ketat ekstraksi KTP Republik Indonesia
+    const instruksiOcr = `Periksa foto KTP Republik Indonesia ini dengan sangat teliti dan presisi:
+1. Pastikan gambar adalah fisik Kartu Tanda Penduduk (KTP) Republik Indonesia.
+2. Jika BUKAN KTP atau sangat buram/tidak terbaca, kembalikan JSON:
+   {"is_ktp": false, "alasan": "Gambar bukan KTP Indonesia yang valid atau foto terlalu buram."}
+3. Jika KTP VALID, ekstrak data dengan akurasi 100% huruf demi huruf:
+   - "nik": 16 digit angka NIK (hanya angka).
+   - "nama": Nama LENGKAP pemilik KTP yang tercetak tepat di baris bawah NIK (setelah label "Nama" atau "Nama :"). AMBIL HANYA NAMA ORANG TERSEBUT, tanpa kata "Nama" atau tanda titik dua. Gunakan HURUF BESAR persis seperti pada kartu. JANGAN pernah mengambil nama pejabat/kota tanda tangan di kanan bawah atau nama provinsi di bagian atas.
+   - "tempat_lahir": Tempat lahir saja (sebelum tanda koma pada baris Tempat/Tgl Lahir).
+   - "tanggal_lahir": Tanggal lahir format DD-MM-YYYY (atau seperti yang tertera).
+   - "jenis_kelamin": "LAKI-LAKI" atau "PEREMPUAN".
+   - "alamat": Alamat jalan/gang/nomor yang tercantum di baris Alamat.
+   - "rt_rw": Nomor RT dan RW (misal "003/005").
+   - "kel_desa": Kelurahan atau Desa.
+   - "kecamatan": Kecamatan.
+   - "agama": Agama pemilik.
+   - "status_perkawinan": Status perkawinan.
+   - "pekerjaan": Pekerjaan.
+   - "kewarganegaraan": Kewarganegaraan (biasanya "WNI").
+
+KEMBALIKAN HANYA OBJEK JSON MURNI TANPA BLOK MARKDOWN.`;
 
     const response = await openai.chat.completions.create({
-      model: aiConfig.model_ocr || 'gpt-6-luna',
+      model: aiConfig.model_ocr || 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: 'Kamu adalah sistem AI verifikasi dokumen identitas resmi KTP Republik Indonesia. Tugas utamamu adalah memvalidasi apakah gambar adalah KTP asli dan mengekstrak datanya. Jika bukan KTP atau gambar tidak relevan, tolak secara tegas dengan is_ktp: false. Selalu respon dengan JSON valid murni.'
+          content: 'Kamu adalah mesin OCR pembaca data identitas KTP Republik Indonesia yang sangat presisi, akurat, dan tidak pernah berhalusinasi. Ekstrak data teks secara teliti terutama nama lengkap pemilik KTP persis sesuai yang tercetak di kartu. Selalu kembalikan respon dalam format JSON valid.'
         },
         {
           role: 'user',
           content: [
-            { type: 'text', text: prompt },
+            { type: 'text', text: instruksiOcr },
             {
               type: 'image_url',
               image_url: {
@@ -66,6 +79,26 @@ Wajib berikan format JSON murni tanpa awalan/akhiran markdown.`;
         isKtp: false,
         error: 'Gagal membaca format data KTP dari AI. Silakan foto ulang dengan pencahayaan yang cukup.'
       };
+    }
+
+    // Normalisasi dan sanitasi teks nama & NIK
+    if (parsedData.nama || parsedData.nama_lengkap || parsedData.Nama) {
+      let rawNama = parsedData.nama || parsedData.nama_lengkap || parsedData.Nama || '';
+      if (typeof rawNama === 'string') {
+        // Hilangkan kemungkinan prefix "Nama :", "Nama:", "Nama -", dsb
+        rawNama = rawNama.replace(/^nama\s*[:\-\.]?\s*/i, '').trim();
+        // Hilangkan tanda petik
+        rawNama = rawNama.replace(/^["']|["']$/g, '').trim();
+        parsedData.nama = rawNama;
+      }
+    }
+
+    if (parsedData.nik) {
+      // Pastikan NIK bersih hanya digit
+      const digitsOnly = String(parsedData.nik).replace(/\D/g, '').trim();
+      if (digitsOnly.length >= 8) {
+        parsedData.nik = digitsOnly;
+      }
     }
 
     // Validasi ketat hasil deteksi
