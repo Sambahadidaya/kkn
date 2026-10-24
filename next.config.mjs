@@ -54,6 +54,10 @@ const nextConfig = {
           {
             key: 'X-Frame-Options',
             value: 'SAMEORIGIN'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(self), microphone=()'
           }
         ]
       }

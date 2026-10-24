@@ -54,28 +54,28 @@ export default function AiAsisten() {
 
       {/* Jendela Chat Asisten */}
       {isOpen && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 sm:w-96 sm:h-[500px] z-50 bg-white sm:rounded-2xl shadow-2xl border border-stone-200 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-24 sm:right-6 sm:w-96 sm:h-[500px] z-50 bg-white dark:bg-stone-900 sm:rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-800 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5">
           {/* Header */}
-          <div className="bg-[#2d6a4f] text-white p-4 flex items-center justify-between">
+          <div className="bg-[#2d6a4f] dark:bg-emerald-700 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center">
                 <Bot className="w-5 h-5" />
               </div>
               <div>
                 <h4 className="font-bold text-sm leading-tight">Asisten Edukasi Sampah</h4>
-                <p className="text-[11px] text-emerald-100">Bantuan memilah sampah ramah keluarga</p>
+                <p className="text-[11px] text-emerald-100 dark:text-emerald-200">Bantuan memilah sampah ramah keluarga</p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 hover:bg-white/20 rounded-lg text-white"
+              className="p-1.5 hover:bg-white/20 rounded-lg text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Kotak Riwayat Percakapan */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#f7faf8]">
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#f7faf8] dark:bg-stone-950/70">
             {chatList.map((chat, idx) => {
               const isMe = chat.role === 'user';
               return (
@@ -84,21 +84,21 @@ export default function AiAsisten() {
                   className={`flex items-start gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isMe && (
-                    <div className="w-7 h-7 rounded-full bg-[#d8f3dc] text-[#1b4332] flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-full bg-[#d8f3dc] dark:bg-emerald-950 text-[#1b4332] dark:text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
                       <Bot className="w-4 h-4" />
                     </div>
                   )}
                   <div
                     className={`max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${
                       isMe
-                        ? 'bg-[#2d6a4f] text-white rounded-tr-none'
-                        : 'bg-white text-stone-800 border border-stone-200 shadow-2xs rounded-tl-none'
+                        ? 'bg-[#2d6a4f] dark:bg-emerald-600 text-white rounded-tr-none'
+                        : 'bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 shadow-2xs rounded-tl-none'
                     }`}
                   >
                     {chat.content}
                   </div>
                   {isMe && (
-                    <div className="w-7 h-7 rounded-full bg-stone-300 text-stone-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded-full bg-stone-300 dark:bg-stone-700 text-stone-700 dark:text-stone-300 flex items-center justify-center shrink-0 mt-0.5">
                       <User className="w-4 h-4" />
                     </div>
                   )}
@@ -106,28 +106,28 @@ export default function AiAsisten() {
               );
             })}
             {loading && (
-              <div className="flex items-center gap-2 text-stone-500 text-xs py-2">
-                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] animate-bounce" />
-                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] animate-bounce [animation-delay:0.2s]" />
-                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] animate-bounce [animation-delay:0.4s]" />
+              <div className="flex items-center gap-2 text-stone-500 dark:text-stone-400 text-xs py-2">
+                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] dark:bg-emerald-400 animate-bounce" />
+                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] dark:bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
+                <div className="w-2 h-2 rounded-full bg-[#2d6a4f] dark:bg-emerald-400 animate-bounce [animation-delay:0.4s]" />
                 <span>Menyiapkan jawaban...</span>
               </div>
             )}
           </div>
 
           {/* Form Input Pesan */}
-          <form onSubmit={kirimPesan} className="p-3 bg-white border-t border-stone-200 flex gap-2">
+          <form onSubmit={kirimPesan} className="p-3 bg-white dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800 flex gap-2">
             <input
               type="text"
               value={pesan}
               onChange={(e) => setPesan(e.target.value)}
               placeholder="Contoh: Kulit telur masuk sampah apa?"
-              className="flex-1 px-3.5 py-2 text-sm border border-stone-300 rounded-xl focus:outline-hidden focus:border-[#2d6a4f] focus:ring-1 focus:ring-[#2d6a4f]"
+              className="flex-1 px-3.5 py-2 text-sm bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 border border-stone-300 dark:border-stone-700 rounded-xl focus:outline-hidden focus:border-[#2d6a4f] dark:focus:border-emerald-500 placeholder:text-stone-400 dark:placeholder:text-stone-500"
             />
             <button
               type="submit"
               disabled={loading || !pesan.trim()}
-              className="p-2.5 bg-[#2d6a4f] text-white rounded-xl hover:bg-[#1b4332] disabled:opacity-50 shrink-0"
+              className="p-2.5 bg-[#2d6a4f] hover:bg-[#1b4332] dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-xl disabled:opacity-50 shrink-0 cursor-pointer"
             >
               <Send className="w-4 h-4" />
             </button>

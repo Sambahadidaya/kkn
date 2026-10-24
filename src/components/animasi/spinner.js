@@ -10,9 +10,9 @@ export default function Spinner({ size = 'md', text = null, className = '' }) {
   return (
     <div className={`flex flex-col items-center justify-center gap-2 ${className}`}>
       <div
-        className={`${sizeMap[size] || sizeMap.md} rounded-full border-[#d8f3dc] border-t-[#2d6a4f] animate-spin`}
+        className={`${sizeMap[size] || sizeMap.md} rounded-full border-[#d8f3dc] dark:border-emerald-950 border-t-[#2d6a4f] dark:border-t-emerald-400 animate-spin`}
       />
-      {text && <span className="text-sm font-medium text-stone-600">{text}</span>}
+      {text && <span className="text-sm font-medium text-stone-600 dark:text-stone-300">{text}</span>}
     </div>
   );
 }

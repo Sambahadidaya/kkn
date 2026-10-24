@@ -1,5 +1,6 @@
 import './globals.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import ThemeProvider from '../components/themeProvider';
 
 export const metadata = {
   title: 'KKN Tematik Pengolahan Sampah Lingkungan',
@@ -9,9 +10,11 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id">
-      <body className="min-h-screen bg-[#f7faf8] text-[#1c2826] antialiased">
-        {children}
+    <html lang="id" suppressHydrationWarning>
+      <body className="min-h-screen bg-[var(--background)] text-[var(--foreground)] antialiased transition-colors duration-200">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

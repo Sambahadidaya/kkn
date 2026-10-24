@@ -1,12 +1,27 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f7faf8;
   --foreground: #1c2826;
+  --card-bg: #ffffff;
+  --card-border: #e7e5e4;
   --primary: #2d6a4f;
   --primary-dark: #1b4332;
   --primary-light: #40916c;
   --primary-surface: #eef8f2;
+}
+
+.dark {
+  --background: #0f1512;
+  --foreground: #f3f4f6;
+  --card-bg: #18221d;
+  --card-border: #26362e;
+  --primary: #40916c;
+  --primary-dark: #2d6a4f;
+  --primary-light: #52b788;
+  --primary-surface: #13241b;
 }
 
 body {
@@ -17,6 +32,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Scrollbar halus untuk kartu kategori sampah yang digeser menyamping */

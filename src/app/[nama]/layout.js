@@ -18,7 +18,7 @@ export default async function RoleLayout({ children, params }) {
   const profile = authCheck.profile;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f7faf8] text-[#1c2826] relative pb-mobile-nav md:pb-0">
+    <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--foreground)] relative pb-mobile-nav md:pb-0 transition-colors">
       <SiteBackground />
       <DynamicFavicon />
 

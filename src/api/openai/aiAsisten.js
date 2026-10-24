@@ -31,10 +31,10 @@ export async function tanyaAiAsistenAction(pertanyaan, history = []) {
     ];
 
     const response = await openai.chat.completions.create({
-      model: aiConfig.model_asisten || 'gpt-4o-mini',
+      model: aiConfig.model_asisten || 'gpt-6-luna',
       messages,
-      max_tokens: 600,
-      temperature: 0.5
+      max_completion_tokens: 600,
+      temperature: 1
     });
 
     const jawaban = response.choices?.[0]?.message?.content || 'Maaf, belum ada jawaban.';

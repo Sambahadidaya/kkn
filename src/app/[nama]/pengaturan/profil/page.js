@@ -8,6 +8,8 @@ import Notifikasi from '../../../../components/notifikasi';
 import Spinner from '../../../../components/spinner';
 import { User, Shield, BookOpen, FileText, Phone, Save } from 'lucide-react';
 
+import { validateNama, validatePhone, validateUsername } from '../../../../scurity/formatLimitKarak';
+
 export default function PengaturanProfilPage() {
   const params = useParams();
   const role = params?.nama?.toLowerCase();
@@ -19,6 +21,7 @@ export default function PengaturanProfilPage() {
 
   const [form, setForm] = useState({
     nama: '',
+    username: '',
     noTelepon: ''
   });
 
@@ -29,6 +32,7 @@ export default function PengaturanProfilPage() {
         setProfile(res.profile);
         setForm({
           nama: res.profile.nama || '',
+          username: res.profile.username || '',
           noTelepon: res.profile.no_telepon || ''
         });
       }
@@ -45,8 +49,27 @@ export default function PengaturanProfilPage() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
     setNotif(null);
+
+    const nameCheck = validateNama(form.nama);
+    if (!nameCheck.valid) {
+      setNotif({ tipe: 'error', pesan: nameCheck.message });
+      return;
+    }
+
+    const usernameCheck = validateUsername(form.username);
+    if (!usernameCheck.valid) {
+      setNotif({ tipe: 'error', pesan: usernameCheck.message });
+      return;
+    }
+
+    const phoneCheck = validatePhone(form.noTelepon);
+    if (!phoneCheck.valid) {
+      setNotif({ tipe: 'error', pesan: phoneCheck.message });
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const res = await updateProfilePengaturanAction(form);
       if (res.success) {
@@ -122,6 +145,21 @@ export default function PengaturanProfilPage() {
             onChange={(e) => setForm({ ...form, nama: e.target.value })}
             className="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-stone-600 uppercase mb-1">Nama Pengguna (Username)</label>
+          <input
+            type="text"
+            required
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            placeholder="Contoh: sitir01"
+            className="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl"
+          />
+          <span className="text-[11px] text-stone-400 mt-1 block">
+            Dapat digunakan untuk masuk ke akun sebagai pengganti email atau nomor HP.
+          </span>
         </div>
 
         <div>

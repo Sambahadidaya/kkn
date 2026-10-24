@@ -25,22 +25,22 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
         aria-hidden="true"
       />
       <div
-        className={`relative z-10 w-full ${maxWidth} bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden transform transition-all max-h-[90vh] flex flex-col`}
+        className={`relative z-10 w-full ${maxWidth} bg-white dark:bg-stone-900 rounded-2xl shadow-xl border border-stone-200 dark:border-stone-800 overflow-hidden transform transition-all max-h-[90vh] flex flex-col`}
       >
         {/* Header Modal */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 bg-[#f7faf8]">
-          <h3 className="font-semibold text-lg text-stone-800">{title}</h3>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800 bg-[#f7faf8] dark:bg-stone-900/80">
+          <h3 className="font-semibold text-lg text-stone-800 dark:text-stone-100">{title}</h3>
           <button
             onClick={onClose}
             type="button"
-            className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-lg transition-colors"
+            className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Isi Modal */}
-        <div className="p-5 overflow-y-auto">
+        <div className="p-5 overflow-y-auto text-stone-700 dark:text-stone-300">
           {children}
         </div>
       </div>

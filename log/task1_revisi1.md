@@ -1,0 +1,2 @@
+pada halaman register itu tepatnya pada tahap kedua saya ingin halaman tahap kedua itu cuman scan foto atau upload foto saja dan tahap ketiga itu untuk hasil scan ktp tadi jadi user harus foto ktp dulu, terus pada membuka akses kamera itu malah tidak muncul kameranya seperti terblokir atau gimana padahal saya sudah allow akses kamera di browsernya padahal di web lain bisa.
+terus mau itu halaman login ataupun registrasi ataupun halaman biasa ataupun halaman admin itu ada fitur darkmode dan lighmode, yang tooglenya itu difile toogleTheme.js itu.

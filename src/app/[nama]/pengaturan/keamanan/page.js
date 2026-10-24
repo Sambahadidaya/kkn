@@ -5,7 +5,9 @@ import { useParams } from 'next/navigation';
 import { updateProfilePengaturanAction } from '../../../../api/supabase/public/profile';
 import Notifikasi from '../../../../components/notifikasi';
 import Spinner from '../../../../components/spinner';
-import { Lock, Shield, User, BookOpen, FileText, Phone, KeyRound } from 'lucide-react';
+import PasswordInput from '../../../../components/passwordInput';
+import { validatePassword } from '../../../../scurity/formatLimitKarak';
+import { Shield, User, BookOpen, FileText, Phone, KeyRound } from 'lucide-react';
 
 export default function PengaturanKeamananPage() {
   const params = useParams();
@@ -26,8 +28,9 @@ export default function PengaturanKeamananPage() {
 
   const handleGantiPassword = async (e) => {
     e.preventDefault();
-    if (passwordBaru.length < 6) {
-      setNotif({ tipe: 'error', pesan: 'Kata sandi baru minimal 6 karakter.' });
+    const pwdCheck = validatePassword(passwordBaru);
+    if (!pwdCheck.valid) {
+      setNotif({ tipe: 'error', pesan: pwdCheck.message });
       return;
     }
     if (passwordBaru !== konfirmasi) {
@@ -93,14 +96,12 @@ export default function PengaturanKeamananPage() {
           <label className="block text-xs font-semibold text-stone-600 uppercase mb-1">
             Kata Sandi Baru
           </label>
-          <input
-            type="password"
-            required
-            minLength={6}
+          <PasswordInput
             value={passwordBaru}
             onChange={(e) => setPasswordBaru(e.target.value)}
             placeholder="Minimal 6 karakter"
-            className="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl"
+            required
+            minLength={6}
           />
         </div>
 
@@ -108,14 +109,12 @@ export default function PengaturanKeamananPage() {
           <label className="block text-xs font-semibold text-stone-600 uppercase mb-1">
             Ulangi Kata Sandi Baru
           </label>
-          <input
-            type="password"
-            required
-            minLength={6}
+          <PasswordInput
             value={konfirmasi}
             onChange={(e) => setKonfirmasi(e.target.value)}
             placeholder="Masukkan ulang kata sandi baru"
-            className="w-full px-3.5 py-2.5 text-sm border border-stone-300 rounded-xl"
+            required
+            minLength={6}
           />
         </div>
 

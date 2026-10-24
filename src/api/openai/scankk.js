@@ -15,7 +15,7 @@ export async function scanKkAction(imageBase64) {
     }
 
     const response = await openai.chat.completions.create({
-      model: aiConfig.model_ocr || 'gpt-4o-mini',
+      model: aiConfig.model_ocr || 'gpt-6-luna',
       messages: [
         {
           role: 'system',
@@ -29,7 +29,7 @@ export async function scanKkAction(imageBase64) {
           ]
         }
       ],
-      max_tokens: 800
+      max_completion_tokens: 800
     });
 
     const raw = response.choices?.[0]?.message?.content || '{}';

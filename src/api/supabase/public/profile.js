@@ -3,7 +3,8 @@
 // Server Action untuk Pengaturan Profil, Papan Peringkat (Leaderboard), dan Ubah Kata Sandi
 import { getSupabaseServiceClient, getSupabaseServerClient } from '../../../utils/supabaseUtils';
 import { getCurrentUserProfile } from '../../../scurity/roleakses';
-import { sanitizePhone, sanitizeString } from '../../../scurity/sanitaze';
+import { sanitizePhone, sanitizeString, sanitizeUsername } from '../../../scurity/sanitaze';
+import { validatePhone, validateNama, validateUsername } from '../../../scurity/formatLimitKarak';
 
 export async function getProfileDetailAction() {
   try {
@@ -31,7 +32,7 @@ export async function getProfileDetailAction() {
   }
 }
 
-export async function updateProfilePengaturanAction({ nama, noTelepon, passwordBaru }) {
+export async function updateProfilePengaturanAction({ nama, noTelepon, username, passwordBaru }) {
   try {
     const profile = await getCurrentUserProfile();
     if (!profile) return { success: false, error: 'Belum login' };
@@ -39,8 +40,38 @@ export async function updateProfilePengaturanAction({ nama, noTelepon, passwordB
     const service = getSupabaseServiceClient();
     const updateData = {};
 
-    if (nama) updateData.nama = sanitizeString(nama, 100);
-    if (noTelepon) updateData.no_telepon = sanitizePhone(noTelepon);
+    if (nama) {
+      const nameCheck = validateNama(nama);
+      if (!nameCheck.valid) return { success: false, error: nameCheck.message };
+      updateData.nama = sanitizeString(nama, 100);
+    }
+
+    if (noTelepon) {
+      const phoneCheck = validatePhone(noTelepon);
+      if (!phoneCheck.valid) return { success: false, error: phoneCheck.message };
+      updateData.no_telepon = sanitizePhone(noTelepon);
+    }
+
+    if (username) {
+      const cleanUsername = sanitizeUsername(username);
+      const userCheck = validateUsername(cleanUsername);
+      if (!userCheck.valid) return { success: false, error: userCheck.message };
+
+      if (cleanUsername !== profile.username) {
+        // Cek apakah username sudah dipakai user lain
+        const { data: existingUser } = await service
+          .from('profiles')
+          .select('id')
+          .eq('username', cleanUsername)
+          .neq('id', profile.id)
+          .maybeSingle();
+
+        if (existingUser) {
+          return { success: false, error: 'Username tersebut sudah digunakan oleh akun lain.' };
+        }
+        updateData.username = cleanUsername;
+      }
+    }
 
     if (Object.keys(updateData).length > 0) {
       const { error: profileErr } = await service

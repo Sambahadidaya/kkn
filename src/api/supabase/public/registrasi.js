@@ -1,8 +1,9 @@
 'use server';
 
-// Server Action untuk Registrasi Warga 2-Tahap (Hanya Disimpan Saat Tombol Submit Ditekan)
+// Server Action untuk Registrasi Warga 4-Tahap (Disimpan Saat Tombol Submit Ditekan di Tahap 4)
 import { getSupabaseServiceClient, getSupabaseServerClient } from '../../../utils/supabaseUtils';
 import { sanitizeEmail, sanitizePhone, sanitizeString, sanitizeUsername } from '../../../scurity/sanitaze';
+import { validatePhone, validateEmail, validatePassword, validateNama, generateDefaultUsername } from '../../../scurity/formatLimitKarak';
 import { encryptText, hashNik } from '../../../lib/crypto';
 import { uploadKtpPhoto } from '../storage';
 import { checkRateLimit } from '../../../scurity/ratelimit';
@@ -10,13 +11,9 @@ import { checkRateLimit } from '../../../scurity/ratelimit';
 export async function registrasiWargaAction(formData) {
   try {
     const {
-      // Data Tahap 1
+      // Data Tahap 1 (Nama Saja)
       namaUser,
-      emailUser,
-      noTelepon,
-      password,
-      username,
-      // Data Tahap 2 (KTP & Wilayah)
+      // Data Tahap 2 & 3 (KTP & Wilayah)
       nik,
       namaKtp,
       alamatKtp,
@@ -28,12 +25,33 @@ export async function registrasiWargaAction(formData) {
       rtId,
       rwId,
       nomorRumah,
-      fotoKtpBase64
+      fotoKtpBase64,
+      // Data Tahap 4 (Kontak & Password)
+      emailUser,
+      noTelepon,
+      password,
+      username
     } = formData;
 
-    // Validasi kelengkapan data
-    if (!emailUser || !password || !namaUser || !noTelepon) {
-      return { success: false, error: 'Data akun tahap 1 tidak lengkap.' };
+    // 1. Validasi format ketat menggunakan formatLimitKarak
+    const nameCheck = validateNama(namaUser);
+    if (!nameCheck.valid) {
+      return { success: false, error: nameCheck.message };
+    }
+
+    const phoneCheck = validatePhone(noTelepon);
+    if (!phoneCheck.valid) {
+      return { success: false, error: phoneCheck.message };
+    }
+
+    const emailCheck = validateEmail(emailUser);
+    if (!emailCheck.valid) {
+      return { success: false, error: emailCheck.message };
+    }
+
+    const pwdCheck = validatePassword(password);
+    if (!pwdCheck.valid) {
+      return { success: false, error: pwdCheck.message };
     }
 
     if (!nik || !namaKtp || !rtId || !nomorRumah) {
@@ -43,17 +61,16 @@ export async function registrasiWargaAction(formData) {
     const cleanEmail = sanitizeEmail(emailUser);
     const cleanPhone = sanitizePhone(noTelepon);
     const cleanNama = sanitizeString(namaUser);
-    const cleanUsername = sanitizeUsername(username || emailUser.split('@')[0]);
     const cleanNomorRumah = sanitizeString(nomorRumah, 20);
 
     const service = getSupabaseServiceClient();
 
-    // 1. Cek Rate Limiter
+    // 2. Cek Rate Limiter
     if (!checkRateLimit(`reg_${cleanEmail}`, 5, 60000)) {
       return { success: false, error: 'Terlalu banyak permintaan registrasi. Silakan tunggu.' };
     }
 
-    // 2. Cek apakah NIK sudah pernah terdaftar (menggunakan hashNik tanpa ekspos plain NIK)
+    // 3. Cek apakah NIK sudah pernah terdaftar
     const nikHashed = hashNik(nik);
     const { data: existingNik } = await service
       .from('ktp_data')
@@ -65,11 +82,34 @@ export async function registrasiWargaAction(formData) {
       return { success: false, error: 'Nomor KTP/NIK ini sudah pernah didaftarkan.' };
     }
 
-    // 3. Cek apakah nomor telepon atau username sudah dipakai
+    // 4. Generate default username dari nama jika tidak diinputkan (dan nanti bisa diatur di halaman pengaturan)
+    let baseUsername = sanitizeUsername(username || generateDefaultUsername(cleanNama));
+    if (!baseUsername || baseUsername.length < 3) {
+      baseUsername = 'warga';
+    }
+
+    // Pastikan username unik di tabel profiles
+    let cleanUsername = baseUsername;
+    let counter = 1;
+    while (counter <= 25) {
+      const { data: userWithSameName } = await service
+        .from('profiles')
+        .select('id')
+        .eq('username', cleanUsername)
+        .maybeSingle();
+
+      if (!userWithSameName) {
+        break;
+      }
+      cleanUsername = `${baseUsername.slice(0, 24)}${counter}`;
+      counter++;
+    }
+
+    // 5. Cek apakah nomor telepon atau email sudah dipakai
     const { data: existingProfile } = await service
       .from('profiles')
       .select('id, email, username, no_telepon')
-      .or(`email.eq.${cleanEmail},no_telepon.eq.${cleanPhone},username.eq.${cleanUsername}`)
+      .or(`email.eq.${cleanEmail},no_telepon.eq.${cleanPhone}`)
       .maybeSingle();
 
     if (existingProfile) {
@@ -79,12 +119,9 @@ export async function registrasiWargaAction(formData) {
       if (existingProfile.no_telepon === cleanPhone) {
         return { success: false, error: 'Nomor telepon ini sudah terdaftar.' };
       }
-      if (existingProfile.username === cleanUsername) {
-        return { success: false, error: 'Username ini sudah digunakan, silakan pilih yang lain.' };
-      }
     }
 
-    // 4. Buat Akun Auth di Supabase menggunakan admin createUser
+    // 6. Buat Akun Auth di Supabase menggunakan admin createUser
     const { data: authCreated, error: authError } = await service.auth.admin.createUser({
       email: cleanEmail,
       password,
@@ -101,7 +138,7 @@ export async function registrasiWargaAction(formData) {
 
     const userId = authCreated.user.id;
 
-    // 5. Upload mentahan foto KTP ke bucket privat 'ktp'
+    // 7. Upload mentahan foto KTP ke bucket privat 'ktp'
     let fotoPath = null;
     if (fotoKtpBase64) {
       const uploadRes = await uploadKtpPhoto(fotoKtpBase64, `${userId}.jpg`);
@@ -110,7 +147,7 @@ export async function registrasiWargaAction(formData) {
       }
     }
 
-    // 6. Simpan Profil Warga
+    // 8. Simpan Profil Warga (dengan username otomatis dari nama)
     const { error: profileError } = await service.from('profiles').insert({
       id: userId,
       username: cleanUsername,
@@ -129,7 +166,7 @@ export async function registrasiWargaAction(formData) {
       return { success: false, error: 'Gagal membuat profil: ' + profileError.message };
     }
 
-    // 7. Simpan Data Rumah (menghasilkan rumah.id unik yang dipakai sebagai QR Rumah)
+    // 9. Simpan Data Rumah (menghasilkan rumah.id unik yang dipakai sebagai QR Rumah)
     const { error: rumahError } = await service.from('rumah').insert({
       rt_id: rtId,
       nomor_rumah: cleanNomorRumah,
@@ -140,7 +177,7 @@ export async function registrasiWargaAction(formData) {
       console.warn('Peringatan saat membuat data rumah:', rumahError.message);
     }
 
-    // 8. Enkripsi dan Simpan Data KTP (AES-256-GCM)
+    // 10. Enkripsi dan Simpan Data KTP (AES-256-GCM)
     const ktpPayload = {
       user_id: userId,
       nik_hash: nikHashed,
@@ -160,7 +197,7 @@ export async function registrasiWargaAction(formData) {
       console.error('Error menyimpan data KTP terenkripsi:', ktpError);
     }
 
-    // 9. Login otomatis user agar langsung masuk ke sesi
+    // 11. Login otomatis user agar langsung masuk ke sesi
     try {
       const supabaseServer = await getSupabaseServerClient();
       await supabaseServer.auth.signInWithPassword({

@@ -18,15 +18,21 @@ export async function scanKtpAction(imageBase64) {
       cleanDataUrl = `data:image/jpeg;base64,${cleanDataUrl}`;
     }
 
-    const prompt = aiConfig.prompt_ocr_ktp || 
-      'Ekstrak seluruh informasi identitas dari foto KTP Indonesia ini ke dalam format JSON murni tanpa markdown, dengan atribut: nik, nama, tempat_lahir, tanggal_lahir, jenis_kelamin, alamat, rt_rw, kel_desa, kecamatan, agama, status_perkawinan, pekerjaan, kewarganegaraan. Jika ada nilai yang tidak terbaca, beri nilai string kosong atau null.';
+    const prompt = aiConfig.prompt_ocr_ktp ||
+      `Periksa gambar ini dengan teliti. 
+1. Tentukan apakah gambar ini BENAR-BENAR merupakan foto dokumen fisik Kartu Tanda Penduduk (KTP) Republik Indonesia yang valid dan terbaca informasinya.
+2. JIKA GAMBAR BUKAN KTP (misalnya foto orang, selfie, pemandangan, benda sembarangan, dokumen non-KTP) ATAU KTP SANGAT BURAM/TIDAK TERBACA, kembalikan JSON persis seperti ini:
+{"is_ktp": false, "alasan": "Gambar bukan KTP Indonesia yang valid atau foto terlalu buram sehingga data tidak dapat terbaca."}
+3. JIKA GAMBAR ADALAH KTP VALID, ekstrak informasinya ke dalam JSON murni dengan atribut:
+{"is_ktp": true, "nik": "16 digit NIK", "nama": "Nama lengkap", "tempat_lahir": "...", "tanggal_lahir": "DD-MM-YYYY", "jenis_kelamin": "LAKI-LAKI/PEREMPUAN", "alamat": "...", "rt_rw": "...", "kel_desa": "...", "kecamatan": "...", "agama": "...", "status_perkawinan": "...", "pekerjaan": "...", "kewarganegaraan": "WNI"}.
+Wajib berikan format JSON murni tanpa awalan/akhiran markdown.`;
 
     const response = await openai.chat.completions.create({
-      model: aiConfig.model_ocr || 'gpt-4o-mini',
+      model: aiConfig.model_ocr || 'gpt-6-luna',
       messages: [
         {
           role: 'system',
-          content: 'Kamu adalah sistem OCR AI profesional spesialis dokumen kependudukan KTP Indonesia. Selalu berikan output dalam format JSON valid tanpa tanda kutip markdown ```json.'
+          content: 'Kamu adalah sistem AI verifikasi dokumen identitas resmi KTP Republik Indonesia. Tugas utamamu adalah memvalidasi apakah gambar adalah KTP asli dan mengekstrak datanya. Jika bukan KTP atau gambar tidak relevan, tolak secara tegas dengan is_ktp: false. Selalu respon dengan JSON valid murni.'
         },
         {
           role: 'user',
@@ -42,8 +48,8 @@ export async function scanKtpAction(imageBase64) {
           ]
         }
       ],
-      max_tokens: 1000,
-      temperature: 0.1
+      max_completion_tokens: 1000,
+      temperature: 1
     });
 
     const rawText = response.choices?.[0]?.message?.content || '{}';
@@ -55,16 +61,25 @@ export async function scanKtpAction(imageBase64) {
       parsedData = JSON.parse(cleanedJson);
     } catch (parseError) {
       console.warn('Gagal parse direct JSON dari OpenAI OCR, raw output:', rawText);
-      parsedData = {
-        nama: '',
-        nik: '',
-        alamat: '',
-        pekerjaan: ''
+      return {
+        success: false,
+        isKtp: false,
+        error: 'Gagal membaca format data KTP dari AI. Silakan foto ulang dengan pencahayaan yang cukup.'
+      };
+    }
+
+    // Validasi ketat hasil deteksi
+    if (parsedData.is_ktp === false || !parsedData.nik || String(parsedData.nik).trim().length < 8) {
+      return {
+        success: false,
+        isKtp: false,
+        error: parsedData.alasan || 'Gambar yang Anda ambil tidak terdeteksi sebagai KTP Indonesia atau NIK tidak terbaca. Harap foto ulang KTP Anda.'
       };
     }
 
     return {
       success: true,
+      isKtp: true,
       data: parsedData
     };
   } catch (err) {

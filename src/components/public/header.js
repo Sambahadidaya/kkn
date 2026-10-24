@@ -20,7 +20,7 @@ export default function Header({ role = 'warga', profile = null }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-stone-200 dark:border-stone-800 transition-colors">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo dan Judul */}
         <div className="flex items-center gap-3">
@@ -29,10 +29,10 @@ export default function Header({ role = 'warga', profile = null }) {
               ♻
             </div>
             <div>
-              <h1 className="font-bold text-base md:text-lg text-[#1b4332] leading-tight">
+              <h1 className="font-bold text-base md:text-lg text-[#1b4332] dark:text-emerald-400 leading-tight">
                 KKN Sampah
               </h1>
-              <span className="text-[11px] font-semibold text-emerald-800 bg-[#d8f3dc] px-2 py-0.5 rounded-full">
+              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 bg-[#d8f3dc] dark:bg-emerald-950/70 border border-transparent dark:border-emerald-800/50 px-2 py-0.5 rounded-full">
                 {info.nama}
               </span>
             </div>
@@ -49,8 +49,8 @@ export default function Header({ role = 'warga', profile = null }) {
                 href={item.href}
                 className={`px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'bg-[#eef8f2] text-[#2d6a4f]'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                    ? 'bg-[#eef8f2] dark:bg-emerald-950/60 text-[#2d6a4f] dark:text-emerald-300 font-bold'
+                    : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white hover:bg-stone-50 dark:hover:bg-stone-800'
                 }`}
               >
                 {item.label}
@@ -66,7 +66,7 @@ export default function Header({ role = 'warga', profile = null }) {
             onClick={handleLogout}
             type="button"
             title="Keluar"
-            className="p-2 text-stone-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+            className="p-2 text-stone-500 dark:text-stone-400 hover:text-rose-700 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition-colors cursor-pointer"
           >
             <LogOut className="w-5 h-5" />
           </button>
